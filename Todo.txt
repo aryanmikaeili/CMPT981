@@ -1,0 +1,14 @@
+# Second-order methods we can use:
+1 - Deep learning via Hessian-free optimization (old paper)
+2 - AdaHessian: An Adaptive Second Order Optimizer for Machine
+Learning
+3 - Scalable and Practical Natural Gradient
+for Large-Scale Deep Learning 
+4 -Improving L-BFGS Initialization For
+Trust-Region Methods In Deep Learning
+
+# Find Task to train on:
+1 - Mnist data from Cornell kids
+2 - Cifar tasks from Sutton
+3 - Aryans Idea
+4 - Linear Regression
