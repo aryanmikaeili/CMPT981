@@ -1,11 +1,12 @@
 # Second-order methods we can use:
 1 - Deep learning via Hessian-free optimization (old paper)
 2 - AdaHessian: An Adaptive Second Order Optimizer for Machine
-Learning
+Learning (https://github.com/amirgholami/adahessian)
 3 - Scalable and Practical Natural Gradient
 for Large-Scale Deep Learning 
 4 -Improving L-BFGS Initialization For
 Trust-Region Methods In Deep Learning
+5 - Sketch-Based Empirical Natural Gradient Methods for Deep Learning : (https://github.com/yangorwell/SENG) - (https://machine-learning-made-simple.medium.com/improving-gradient-descent-for-better-deep-learning-with-natural-gradients-327e5faa836a)
 
 # Find Task to train on:
 1 - Mnist data from Cornell kids
