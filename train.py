@@ -11,6 +11,7 @@ from tqdm import tqdm
 from dataset import ImageDataset
 from model import FCNet
 import utils
+from torch.utils.tensorboard import SummaryWriter
 
 from accelerate.utils import set_seed
 class Trainer:
@@ -83,12 +84,19 @@ class Trainer:
 
 
 if __name__ == '__main__':
-    set_seed(42)
+    seed = 42
+    set_seed(seed)
+    writer = SummaryWriter(f'./runs_{seed}_scratch')
     image_dir = 'circles4'
     image_paths = sorted(os.listdir('circles4'))
 
     model = None
-    for image_path in image_paths:
+    for counter, image_path in enumerate(image_paths):
         print(image_path)
-        trainer = Trainer(os.path.join(image_dir, image_path), 256, batch_size=256*256, nepochs=500, model = model, out_dir='output4')
+        trainer = Trainer(os.path.join(image_dir, image_path), 256, batch_size=256*256, nepochs=500, model = None, out_dir='output4')
         model, psnr = trainer.run()
+        #trainer = Trainer(os.path.join(image_dir, image_path), 256, batch_size=256*256, nepochs=500, model = None, out_dir=f'output{5}')
+        #model_scratch, psnr_scratch = trainer.run()
+        writer.add_scalar('PSNR', psnr, counter)
+        #writer.add_scalar('PSNR_scratch', psnr_scratch, counter)
+        #writer.add_scalar('PSNR_diff', psnr - psnr_scratch, counter)
