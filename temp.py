@@ -11,15 +11,12 @@ from tqdm import tqdm
 from dataset import ImageDataset
 from model import FCNet
 import utils
-from torch.utils.tensorboard import SummaryWriter
-
-from accelerate.utils import set_seed
 from optim_adahessian import Adahessian
 import argparse
-
+from accelerate.utils import set_seed
 class Trainer:
-    def __init__(self, image_path, res, use_pe=True, device='cuda', batch_size = 4096, 
-                 nepochs = 200, model = None, out_dir = 'output', optimizer = 'adam', lr = 1e-3):
+    def __init__(self, image_path, res, use_pe=True, device='cuda', batch_size = 4096, nepochs = 200, optimizer = 'adam',
+                  model = None, out_dir = 'output'):
         self.dataset = ImageDataset(image_path, res, device)
         self.res = res
         self.dataloader = DataLoader(self.dataset, batch_size=batch_size, shuffle=True)
@@ -33,12 +30,11 @@ class Trainer:
         else:
             self.model = FCNet(use_pe, num_res = 10, num_layers = 2, width=256).to(device)
         if optimizer == 'adam':
-            self.optimizer = torch.optim.Adam(self.model.parameters(), lr= lr)
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
+        
             self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=100, gamma=0.5)
         elif optimizer == 'adahessian':
             self.optimizer = Adahessian(self.model.parameters())
-        elif optimizer == 'lbfgs':
-            self.optimizer = torch.optim.LBFGS(self.model.parameters(), lr=lr)
         self.criterion = torch.nn.MSELoss()
 
         self.nepochs = nepochs
@@ -92,12 +88,11 @@ class Trainer:
 
 
 
-
 if __name__ == '__main__':
     # arguments
     parser = argparse.ArgumentParser(description='Continual Learning on the Circles')
     parser.add_argument('-optimizer',
-                        choices=['adahessian', 'adam', 'lbfgs'],
+                        choices=['adahessian', 'adam'],
                         help='optimizer for training the model',
                         default= 'adam') # TODO implement others
     
@@ -105,50 +100,19 @@ if __name__ == '__main__':
 
     # parser.add_argument('-batch_size',  type = int , default= 4096 , help = 'batch_size') 
 
-    parser.add_argument('-image_size',  type = int , default= 256 , help = 'input image size') 
-    parser.add_argument('-lr',  type = float , default= 1e-3 , help = 'learning_rate') 
+    parser.add_argument('-image_size',  type = int , default= 256 , help = 'batch_size') 
     parser.add_argument('-nepochs',  type = int , default= 500 , help = 'epochs') 
-    parser.add_argument('-training_mode',  choices=['continual', 'scratch'],
-                        help='training_mode',
-                        default= 'scratch') 
 
     args = parser.parse_args()
     set_seed(args.seed)
-    writer = SummaryWriter(f'./runs_{args.seed}_scratch')
+
+
     image_dir = 'circles4'
     image_paths = sorted(os.listdir('circles4'))
 
     model = None
-    print(f'Model is being trained in {args.training_mode} mode')
-    print(f'The input image dir is {image_dir}')
-    
-    for counter, image_path in enumerate(image_paths):
+    for image_path in image_paths:
         print(image_path)
-        if args.training_mode == 'scratch':
-            trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
-                           nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr,
-                              model = None, out_dir='output4')
-            model, psnr = trainer.run()
-        else:
-            trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
-                           nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr,
-                               model = model, out_dir='output4')
-            model, psnr = trainer.run()
-        #trainer = Trainer(os.path.join(image_dir, image_path), 256, batch_size=256*256, nepochs=500, model = None, out_dir=f'output{5}')
-        #model_scratch, psnr_scratch = trainer.run()
-        writer.add_scalar('PSNR', psnr, counter)
-        #writer.add_scalar('PSNR_scratch', psnr_scratch, counter)
-        #writer.add_scalar('PSNR_diff', psnr - psnr_scratch, counter)
-
-
-# for training adahessian continually 
-# python3 -m -optimizer adahessian -training_mode continual
-
-# for training lbfgs continually 
-# python3 -m -optimizer lbfgs -training_mode continual
-
-# for training adam continually 
-# python3 -m -training_mode continual
-
-# for training adam from scratch
-# python3 -m -training_mode scratch
+        trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
+                           nepochs= args.nepochs, model = model, out_dir='output4')
+        model, psnr = trainer.run()
