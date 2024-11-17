@@ -15,6 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from accelerate.utils import set_seed
 from optim_adahessian import Adahessian
+from seng import SENG
 import argparse
 
 class Trainer:
@@ -39,6 +40,8 @@ class Trainer:
             self.optimizer = Adahessian(self.model.parameters())
         elif optimizer == 'lbfgs':
             self.optimizer = torch.optim.LBFGS(self.model.parameters(), lr=lr)
+        elif optimizer == 'seng':
+            self.optimizer =  SENG(self.model, 1.2, update_freq=200) # TODO not sure about the params
         self.criterion = torch.nn.MSELoss()
 
         self.nepochs = nepochs
@@ -97,7 +100,7 @@ if __name__ == '__main__':
     # arguments
     parser = argparse.ArgumentParser(description='Continual Learning on the Circles')
     parser.add_argument('-optimizer',
-                        choices=['adahessian', 'adam', 'lbfgs'],
+                        choices=['adahessian', 'adam', 'lbfgs', 'seng'],
                         help='optimizer for training the model',
                         default= 'adam') # TODO implement others
     
@@ -147,13 +150,16 @@ if __name__ == '__main__':
 
 
 # for training adahessian continually 
-# python -optimizer adahessian -training_mode continual
+# python train.py -optimizer adahessian -training_mode continual
 
 # for training lbfgs continually 
-# python3 -m -optimizer lbfgs -training_mode continual
+# python train.py -optimizer lbfgs -training_mode continual
+
+# for training seng continually 
+# python train.py -optimizer seng -training_mode continual
 
 # for training adam continually 
-# python3 -m -training_mode continual
+# python train.py -training_mode continual
 
 # for training adam from scratch
-# python3 -m -training_mode scratch
+# python train.py -training_mode scratch
