@@ -51,7 +51,7 @@ class Trainer:
                 self.optimizer.zero_grad()
                 out = self.model(coords)
                 loss = self.criterion(out, rgb_vals)
-                loss.backward()
+                loss.backward(create_graph=True)
                 self.optimizer.step()
 
 
@@ -114,13 +114,18 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     set_seed(args.seed)
-    writer = SummaryWriter(f'./runs_{args.seed}_scratch')
+    writer = SummaryWriter(f'./runs_{args.seed}_{args.optimizer}_{args.training_mode}')
     image_dir = 'circles4'
     image_paths = sorted(os.listdir('circles4'))
 
     model = None
     print(f'Model is being trained in {args.training_mode} mode')
     print(f'The input image dir is {image_dir}')
+    print(f'The optimizer is {args.optimizer}')
+    print(f'The learning rate is {args.lr}')
+    print(f'The number of epochs is {args.nepochs}')
+    print(f'The image size is {args.image_size}')
+
     
     for counter, image_path in enumerate(image_paths):
         print(image_path)
@@ -142,7 +147,7 @@ if __name__ == '__main__':
 
 
 # for training adahessian continually 
-# python3 -m -optimizer adahessian -training_mode continual
+# python -optimizer adahessian -training_mode continual
 
 # for training lbfgs continually 
 # python3 -m -optimizer lbfgs -training_mode continual
