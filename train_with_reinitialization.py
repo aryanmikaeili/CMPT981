@@ -9,7 +9,7 @@ import numpy as np
 from tqdm import tqdm
 
 from dataset import ImageDataset
-from model import FCNet
+from updated_models import FCNet
 import utils
 from torch.utils.tensorboard import SummaryWriter
 
@@ -17,6 +17,8 @@ from accelerate.utils import set_seed
 from optim_adahessian import Adahessian
 from seng import SENG
 import argparse
+from parser_utils import str2bool
+from high_frequency_detection import detect_high_frequency
 
 class Trainer:
     def __init__(self, image_path, res, use_pe=True, device='cuda', batch_size = 4096, 
@@ -98,7 +100,7 @@ class Trainer:
 
 if __name__ == '__main__':
     # arguments
-    parser = argparse.ArgumentParser(description='Continual Learning on the Circles')
+    parser = argparse.ArgumentParser(description='Continual Learning on the Circles with optional reinitialization')
     parser.add_argument('-optimizer',
                         choices=['adahessian', 'adam', 'lbfgs', 'seng'],
                         help='optimizer for training the model',
@@ -114,13 +116,28 @@ if __name__ == '__main__':
     parser.add_argument('-training_mode',  choices=['continual', 'scratch'],
                         help='training_mode',
                         default= 'scratch') 
+    parser.add_argument('-reinitialize', type=str2bool, nargs='?', 
+                        const=True, default= True, help='whether to reinitialize the high frequency nuerons')
+    
+    parser.add_argument('-re_inputs', type=str2bool, nargs='?', 
+                        const=True, default= True, help='if we are reinitializing, should we reinitializing inputs?')
+    
+    parser.add_argument('-re_outputs', type=str2bool, nargs='?', 
+                        const=True, default= True, help='if we are reinitializing, should we reinitializing outputs?')
+    
+    parser.add_argument('-re_th',  type = float , default= 0.8 , help = 'threshold for finding active neurons') 
+
+    
+    
 
     args = parser.parse_args()
     set_seed(args.seed)
-    
-    image_dir = 'circles5'
-    image_paths = sorted(os.listdir('circles5'))
-    writer = SummaryWriter(f'./runs_{args.seed}_{args.optimizer}_{args.training_mode}_{image_dir}')
+    writer = SummaryWriter(f'./runs_{args.seed}_{args.optimizer}_{args.training_mode}_{args.reinitialize}_{args.re_inputs}_{args.re_outputs}_{args.re_th}')
+    #image_dir = f'circles4_reinitialization_{args.re_inputs}_{args.re_outputs}_{args.re_th}'
+
+    image_dir = 'circles4'
+    image_paths = sorted(os.listdir(f'circles4'))
+
     model = None
     print(f'Model is being trained in {args.training_mode} mode')
     print(f'The input image dir is {image_dir}')
@@ -128,39 +145,53 @@ if __name__ == '__main__':
     print(f'The learning rate is {args.lr}')
     print(f'The number of epochs is {args.nepochs}')
     print(f'The image size is {args.image_size}')
+    print(f'Reinitialization is  {args.reinitialize}')
+    print(f're_inputs is {args.re_inputs}')
+    print(f're_outputs is {args.re_outputs}')
+    print(f'the threshold for reinitialization is {args.re_th}')
+    # Set device to 'cuda' if CUDA is available, otherwise default to 'cpu'
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    print(f"Using device: {device}")
+
 
     
     for counter, image_path in enumerate(image_paths):
         print(image_path)
-        
         if args.training_mode == 'scratch':
             trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
-                           nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr,
-                              model = None, out_dir='output_rectangle')
+                           nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr, device= device,
+                              model = None, out_dir=f'output4_reinitialization_{args.re_inputs}_{args.re_outputs}_{args.re_th}')
             model, psnr = trainer.run()
         else:
             trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
-                           nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr,
-                               model = model, out_dir='output_rectangle')
+                           nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr, device= device,
+                               model = model, out_dir=f'output4_reinitialization_{args.re_inputs}_{args.re_outputs}_{args.re_th}')
             model, psnr = trainer.run()
-        #trainer = Trainer(os.path.join(image_dir, image_path), 256, batch_size=256*256, nepochs=500, model = None, out_dir=f'output{5}')
-        #model_scratch, psnr_scratch = trainer.run()
+        
+        if args.reinitialize:
+            print('reinitalizing the model on high frequencey inputs (edges)')
+            
+            print('getting the coordinates with high frequency:')
+            high_frequency_coordinates, _, _ = detect_high_frequency(image_path= os.path.join(image_dir, image_path))
+
+            print(f'number of coordinates with high frequency : {len(high_frequency_coordinates)}')
+
+            high_frequency_coordinates_tensor = torch.tensor(high_frequency_coordinates)
+
+            model.reinitialize_neurons(X = high_frequency_coordinates_tensor, threshold= args.re_th,
+                                       reinit_input= args.re_inputs, reinit_output= args.re_outputs)
+
+        
         writer.add_scalar('PSNR', psnr, counter)
-        #writer.add_scalar('PSNR_scratch', psnr_scratch, counter)
-        #writer.add_scalar('PSNR_diff', psnr - psnr_scratch, counter)
+        
 
 
-# for training adahessian continually 
-# python train.py -optimizer adahessian -training_mode continual
+# for training adam continually with reinitiliazation
+# python train_with_reinitialization.py -optimizer adam -training_mode continual -re_th 0.8
 
-# for training lbfgs continually 
-# python train.py -optimizer lbfgs -training_mode continual
+# for training adam continually with reinitiliazation only on input weights
+# python train_with_reinitialization.py -optimizer adam -training_mode continual -re_th 0.8 -re_outputs False
 
-# for training seng continually 
-# python train.py -optimizer seng -training_mode continual
-
-# for training adam continually 
-# python train.py -training_mode continual
-
-# for training adam from scratch
-# python train.py -training_mode scratch
+# for training adam continually with reinitiliazation only on output weights
+# python train_with_reinitialization.py -optimizer adam -training_mode continual -re_th 0.8 -re_inputs False

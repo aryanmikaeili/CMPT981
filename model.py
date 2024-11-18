@@ -15,7 +15,8 @@ class PE(nn.Module):
         out = torch.cat(outs, dim=-1)
         return out
 class MLP(nn.Module):
-    def __init__(self, input_dim, output_dim, width, num_layers):
+    def __init__(self, input_dim = 2, output_dim = 3, width = 256, num_layers = 2):
+
         super(MLP, self).__init__()
         self.layers = nn.ModuleList()
         self.layers.append(nn.Linear(input_dim, width))
