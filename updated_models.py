@@ -37,13 +37,14 @@ class FCNet(nn.Module):
             out, activations = self.mlp(x, track_activations)
             return out, activations
             
-    def reinitialize_neurons(self, X, threshold, reinit_input=True, reinit_output=True):
+    def reinitialize_neurons(self, X, threshold = None, top_percentage = None, reinit_input=True, reinit_output=True):
         """
         Reinitialize neurons of the MLP based on their average activation over samples X.
         
         Args:
             X (torch.Tensor): Input samples to compute activations
             threshold (float): Threshold for average activation
+            top_percentage (float, optional): Percentage of qualifying neurons to reinitialize (0-100)
             reinit_input (bool): Whether to reinitialize input weights
             reinit_output (bool): Whether to reinitialize output weights
         """
@@ -52,4 +53,4 @@ class FCNet(nn.Module):
             X = self.pe(X)
             
         # Call the MLP's reinitialization method
-        return self.mlp.reinitialize_neurons(X, threshold, reinit_input, reinit_output)
+        return self.mlp.reinitialize_neurons(X, threshold, top_percentage,  reinit_input, reinit_output)

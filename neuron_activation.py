@@ -32,16 +32,22 @@ class ActivationTrackingMLP(nn.Module):
         output = torch.sigmoid(current)
         return output, activations
 
-    def reinitialize_neurons(self, X, threshold, reinit_input=True, reinit_output=True):
+    def reinitialize_neurons(self, X, threshold=None, top_percentage=None, reinit_input=True, reinit_output=True):
         """
         Reinitialize neurons based on their average activation over samples X.
+        If both threshold and top_percentage are provided, reinitialize top_percentage of
+        neurons that have activation > threshold.
         
         Args:
             X (torch.Tensor): Input samples to compute activations
-            threshold (float): Threshold for average activation
+            threshold (float, optional): Threshold for average activation
+            top_percentage (float, optional): Percentage of qualifying neurons to reinitialize (0-100)
             reinit_input (bool): Whether to reinitialize input weights
             reinit_output (bool): Whether to reinitialize output weights
         """
+        if threshold is None and top_percentage is None:
+            raise ValueError("At least one of 'threshold' or 'top_percentage' must be provided")
+            
         # Get activations for all samples
         _, activations = self(X, track_activations=True)
         
@@ -54,10 +60,44 @@ class ActivationTrackingMLP(nn.Module):
             relu_activations = activations[f'relu_{relu_idx}']
             avg_activations = relu_activations.mean(dim=0)  # Average over batch dimension
             
-            # Find neurons to reinitialize
-            neurons_to_reinit = avg_activations > threshold
-            num_reinit = neurons_to_reinit.sum().item()
+            if threshold is None:
+                # Only top percentage-based
+                k = int(len(avg_activations) * top_percentage)
+                if k > 0:
+                    _, top_indices = torch.topk(avg_activations, k)
+                    neurons_to_reinit = torch.zeros_like(avg_activations, dtype=torch.bool)
+                    neurons_to_reinit[top_indices] = True
+                else:
+                    neurons_to_reinit = torch.zeros_like(avg_activations, dtype=torch.bool)
             
+            elif top_percentage is None:
+                # Only threshold-based
+                neurons_to_reinit = avg_activations > threshold
+                
+            else:
+                # Combined case: top percentage of neurons above threshold
+                above_threshold = avg_activations > threshold
+                if above_threshold.sum() > 0:
+                    # Get values and indices of neurons above threshold
+                    qualified_values = avg_activations[above_threshold]
+                    qualified_indices = torch.where(above_threshold)[0]
+                    
+                    # Calculate how many to reinitialize
+                    k = int(len(qualified_indices) * top_percentage)
+                    if k > 0:
+                        # Get indices of top k among qualified neurons
+                        _, top_k_indices = torch.topk(qualified_values, k)
+                        selected_indices = qualified_indices[top_k_indices]
+                        
+                        # Create final mask
+                        neurons_to_reinit = torch.zeros_like(avg_activations, dtype=torch.bool)
+                        neurons_to_reinit[selected_indices] = True
+                    else:
+                        neurons_to_reinit = torch.zeros_like(avg_activations, dtype=torch.bool)
+                else:
+                    neurons_to_reinit = torch.zeros_like(avg_activations, dtype=torch.bool)
+            
+            num_reinit = neurons_to_reinit.sum().item()
             total_neurons += len(avg_activations)
             total_reinitialized += num_reinit
             
@@ -75,13 +115,23 @@ class ActivationTrackingMLP(nn.Module):
                 if reinit_output:
                     nn.init.kaiming_normal_(next_layer.weight[:, neurons_to_reinit])
                 
-                print(f"Layer {linear_idx}: Reinitialized {num_reinit}/{len(avg_activations)} neurons "
-                      f"({(num_reinit/len(avg_activations)*100):.1f}%)")
+                if threshold is not None and top_percentage is not None:
+                    print(f"Layer {linear_idx}: {(above_threshold.sum().item()/len(avg_activations)*100):.1f}% neurons above threshold {threshold:.3f}")
+                    print(f"           Reinitialized top {top_percentage}% of them: {num_reinit}/{len(avg_activations)} neurons "
+                        f"({(num_reinit/len(avg_activations)*100):.1f}%)")
+                elif threshold is not None:
+                    print(f'reinitialized neurons in this layer with activation greater than {threshold}')
+                    print(f"Layer {linear_idx}: Reinitialized {num_reinit}/{len(avg_activations)} neurons "
+                        f"({(num_reinit/len(avg_activations)*100):.1f}%) with activation > {threshold:.3f}")
+                else:
+                    print(f'reinitialized top {top_percentage * 100} % of neurons in this layer')
+                    print(f"Layer {linear_idx}: Reinitialized top {num_reinit}/{len(avg_activations)} neurons "
+                        f"({(num_reinit/len(avg_activations)*100):.1f}%)")
         
         print(f"\nTotal: Reinitialized {total_reinitialized}/{total_neurons} neurons "
-              f"({(total_reinitialized/total_neurons*100):.1f}%)")
+            f"({(total_reinitialized/total_neurons*100):.1f}%)")
         
-        return total_reinitialized, total_neurons
+        return total_reinitialized, total_neurons  
 
 def test_batch_processing():
     # Set random seed for reproducibility

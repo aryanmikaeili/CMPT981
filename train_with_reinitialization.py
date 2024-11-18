@@ -125,14 +125,16 @@ if __name__ == '__main__':
     parser.add_argument('-re_outputs', type=str2bool, nargs='?', 
                         const=True, default= True, help='if we are reinitializing, should we reinitializing outputs?')
     
-    parser.add_argument('-re_th',  type = float , default= 0.8 , help = 'threshold for finding active neurons') 
+    parser.add_argument('-re_th',  type = float , default= None , help = 'threshold for finding active neurons') 
+
+    parser.add_argument('-re_percentage',  type = float , default= None , help = 'percentage for finding active neurons in each layer') 
 
     
     
 
     args = parser.parse_args()
     set_seed(args.seed)
-    writer = SummaryWriter(f'./runs_{args.seed}_{args.optimizer}_{args.training_mode}_{args.reinitialize}_{args.re_inputs}_{args.re_outputs}_{args.re_th}')
+    writer = SummaryWriter(f'./runs_{args.seed}_{args.optimizer}_{args.training_mode}_{args.reinitialize}_{args.re_inputs}_{args.re_outputs}_{args.re_th}_{args.re_percentage}')
     #image_dir = f'circles4_reinitialization_{args.re_inputs}_{args.re_outputs}_{args.re_th}'
 
     image_dir = 'circles4'
@@ -179,7 +181,7 @@ if __name__ == '__main__':
 
             high_frequency_coordinates_tensor = torch.tensor(high_frequency_coordinates)
 
-            model.reinitialize_neurons(X = high_frequency_coordinates_tensor, threshold= args.re_th,
+            model.reinitialize_neurons(X = high_frequency_coordinates_tensor, threshold= args.re_th, top_percentage= args.re_percentage,
                                        reinit_input= args.re_inputs, reinit_output= args.re_outputs)
 
         
@@ -189,6 +191,12 @@ if __name__ == '__main__':
 
 # for training adam continually with reinitiliazation
 # python train_with_reinitialization.py -optimizer adam -training_mode continual -re_th 0.8
+
+# for training adam continually with reinitiliazation with percentage (only reinitialize top 10% in each layer)
+# python train_with_reinitialization.py -optimizer adam -training_mode continual -re_percentage 0.1
+
+#for training adam continually with reinitiliazation with percentage and threshold (only reinitialize top 10% in each layer that have activation greater than threshold)
+# python train_with_reinitialization.py -optimizer adam -training_mode continual -re_percentage 0.1 -re_th 0.8
 
 # for training adam continually with reinitiliazation only on input weights
 # python train_with_reinitialization.py -optimizer adam -training_mode continual -re_th 0.8 -re_outputs False
