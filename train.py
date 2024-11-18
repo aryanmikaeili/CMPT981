@@ -117,10 +117,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     set_seed(args.seed)
-    writer = SummaryWriter(f'./runs_{args.seed}_{args.optimizer}_{args.training_mode}')
-    image_dir = 'circles4'
-    image_paths = sorted(os.listdir('circles4'))
-
+    
+    image_dir = 'circles5'
+    image_paths = sorted(os.listdir('circles5'))
+    writer = SummaryWriter(f'./runs_{args.seed}_{args.optimizer}_{args.training_mode}_{image_dir}')
     model = None
     print(f'Model is being trained in {args.training_mode} mode')
     print(f'The input image dir is {image_dir}')
@@ -132,15 +132,16 @@ if __name__ == '__main__':
     
     for counter, image_path in enumerate(image_paths):
         print(image_path)
+        
         if args.training_mode == 'scratch':
             trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
                            nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr,
-                              model = None, out_dir='output4')
+                              model = None, out_dir='output_rectangle')
             model, psnr = trainer.run()
         else:
             trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
                            nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr,
-                               model = model, out_dir='output4')
+                               model = model, out_dir='output_rectangle')
             model, psnr = trainer.run()
         #trainer = Trainer(os.path.join(image_dir, image_path), 256, batch_size=256*256, nepochs=500, model = None, out_dir=f'output{5}')
         #model_scratch, psnr_scratch = trainer.run()
