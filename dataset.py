@@ -78,6 +78,7 @@ if __name__ == '__main__':
             cv2.circle(image, (x, y), radius, color, -1)
 
         #save the image
+        image[:128,:128, :] = 128
         save_image = Image.fromarray(image.astype(np.uint8))
 
 
