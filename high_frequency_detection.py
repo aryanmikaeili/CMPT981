@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-def detect_high_frequency(image_path, canny_low=0, canny_high=10, blur_sigma=0, threshold=100):
+def detect_high_frequency(image_path, canny_low=0, canny_high=10, blur_sigma=0, threshold=100, dilate = False):
     """
     Detect high-frequency components in an image using multiple methods including Canny edge detection.
     
@@ -43,7 +43,9 @@ def detect_high_frequency(image_path, canny_low=0, canny_high=10, blur_sigma=0, 
     
     # Method 3: Enhanced Canny Edge Detection
     canny_edges = cv2.Canny(gray, canny_low, canny_high)
-    
+    if dilate:
+        kernel = np.ones((5,5),np.uint8)
+        canny_edges = cv2.dilate(canny_edges, kernel, iterations=1)
     # Get coordinates of high-frequency components (using Canny edges)
     high_freq_coords = np.where(canny_edges > 0)
     coords_list = list(zip(high_freq_coords[1], high_freq_coords[0]))
@@ -199,7 +201,10 @@ def test_thresholds(image_path):
 # Example usage
 if __name__ == "__main__":
     image_path = "circles4/circle_000.png"
-    coords, magnitude_img, gradient_img, canny_edges = detect_high_frequency(image_path, threshold=100)
+    coords, magnitude_img, gradient_img, canny_edges = detect_high_frequency(image_path, threshold=100, dilate = True)
+
+    #dilate the canny_edges
+
     visualize_frequency_analysis(image_path, coords, magnitude_img, gradient_img, canny_edges)
     #test_thresholds(image_path)
 
