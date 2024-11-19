@@ -188,6 +188,8 @@ class SENG(Optimizer):
     def compute_all_fim_invs(self):
         for group in self._supported_group():
             self._compute_fim(group)
+        
+    
         self.state['fim_invmats'] = torch.inverse(self.state['fim_invmats'])
 
 

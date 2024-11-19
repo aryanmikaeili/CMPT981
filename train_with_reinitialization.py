@@ -163,12 +163,12 @@ if __name__ == '__main__':
         if args.training_mode == 'scratch':
             trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
                            nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr, device= device,
-                              model = None, out_dir=f'output4_reinitialization_{args.re_inputs}_{args.re_outputs}_{args.re_th}')
+                              model = None, out_dir=f'output4_reinitialization_{args.re_inputs}_{args.re_outputs}_{args.re_th}_{args.re_percentage}')
             model, psnr = trainer.run()
         else:
             trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
                            nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr, device= device,
-                               model = model, out_dir=f'output4_reinitialization_{args.re_inputs}_{args.re_outputs}_{args.re_th}')
+                               model = model, out_dir=f'output4_reinitialization_{args.re_inputs}_{args.re_outputs}_{args.re_th}_{args.re_percentage}')
             model, psnr = trainer.run()
         
         if args.reinitialize:
