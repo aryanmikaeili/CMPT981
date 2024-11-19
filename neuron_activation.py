@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-
+import math 
 class ActivationTrackingMLP(nn.Module):
     def __init__(self, input_dim=2, output_dim=3, width=256, num_layers=2):
         super().__init__()
@@ -110,9 +110,8 @@ class ActivationTrackingMLP(nn.Module):
                     
                     with torch.no_grad():
                         device = current_layer.weight.device
-                        current_layer.weight.data[neurons_to_reinit] = nn.init.kaiming_normal_(
-                            current_layer.weight.data[neurons_to_reinit].clone()
-                        ).to(device)
+                        current_layer.weight.data[neurons_to_reinit] = nn.init.kaiming_uniform_(
+                            current_layer.weight.data[neurons_to_reinit].clone(), a = math.sqrt(5)).to(device) # this is the same as line 107 in nn.linear code
                     if current_layer.bias is not None:
                         nn.init.zeros_(current_layer.bias[neurons_to_reinit]).to(device)
                     
@@ -122,8 +121,8 @@ class ActivationTrackingMLP(nn.Module):
                 if reinit_output:
                     with torch.no_grad():
                         device = next_layer.weight.device
-                        next_layer.weight[:, neurons_to_reinit] = nn.init.kaiming_normal_(next_layer.weight[:, neurons_to_reinit].clone()).to(device)
-                    
+                        next_layer.weight[:, neurons_to_reinit] = nn.init.kaiming_uniform_(next_layer.weight[:, neurons_to_reinit].clone(), a = math.sqrt(5)).to(device)
+                        # this is the same as line 107 in nn.linear code
                 
                 if threshold is not None and top_percentage is not None:
                     print(f"Layer {linear_idx}: {(above_threshold.sum().item()/len(avg_activations)*100):.1f}% neurons above threshold {threshold:.3f}")
