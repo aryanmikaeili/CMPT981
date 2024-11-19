@@ -107,13 +107,21 @@ class ActivationTrackingMLP(nn.Module):
                 
                 # Reinitialize input weights if requested
                 if reinit_input:
-                    nn.init.kaiming_normal_(current_layer.weight[neurons_to_reinit])
+                    
+                    with torch.no_grad():
+                        current_layer.weight.data[neurons_to_reinit] = nn.init.kaiming_normal_(
+                            current_layer.weight.data[neurons_to_reinit].clone()
+                        )
                     if current_layer.bias is not None:
                         nn.init.zeros_(current_layer.bias[neurons_to_reinit])
+                    
+                    
                 
                 # Reinitialize output weights if requested
                 if reinit_output:
-                    nn.init.kaiming_normal_(next_layer.weight[:, neurons_to_reinit])
+                    with torch.no_grad():
+                        next_layer.weight[:, neurons_to_reinit] = nn.init.kaiming_normal_(next_layer.weight[:, neurons_to_reinit].clone())
+                    
                 
                 if threshold is not None and top_percentage is not None:
                     print(f"Layer {linear_idx}: {(above_threshold.sum().item()/len(avg_activations)*100):.1f}% neurons above threshold {threshold:.3f}")

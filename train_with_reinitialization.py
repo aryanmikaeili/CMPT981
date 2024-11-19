@@ -175,7 +175,7 @@ if __name__ == '__main__':
             print('reinitalizing the model on high frequencey inputs (edges)')
             
             print('getting the coordinates with high frequency:')
-            high_frequency_coordinates, _, _ = detect_high_frequency(image_path= os.path.join(image_dir, image_path))
+            high_frequency_coordinates, _, _, _ = detect_high_frequency(image_path= os.path.join(image_dir, image_path))
 
             print(f'number of coordinates with high frequency : {len(high_frequency_coordinates)}')
 
