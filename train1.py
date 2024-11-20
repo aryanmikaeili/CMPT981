@@ -49,17 +49,19 @@ class Trainer:
             self.model.train()
             for coords, rgb_vals in self.dataloader:
                 self.optimizer.zero_grad()
-                out = self.model(coords)
+                out, low_freq, high_freq = self.model(coords)
                 loss = self.criterion(out, rgb_vals)
+                loss_low_freq = self.criterion(low_freq, rgb_vals)
+                loss = loss + loss_low_freq
                 loss.backward()
                 self.optimizer.step()
 
 
-            if (epoch + 1) % 10 == 0:
+            if (epoch + 1) % 10 == 0 or epoch == 0:
                 self.model.eval()
                 with torch.no_grad():
                     coords = self.dataset.coords
-                    pred = self.model(coords)
+                    pred, low_freq, high_freq = self.model(coords)
                     gt = self.dataset.rgb_vals
                     psnr = utils.get_psnr(pred, gt)
                 pbar.set_description(f'Epoch:: {epoch}, PSNR: {psnr.item()}')
@@ -68,14 +70,22 @@ class Trainer:
                 gt = self.dataset.rgb_vals.cpu().numpy().reshape(*self.dataset.image.size[::-1], 3)
                 gt = (gt * 255).astype(np.uint8)
                 save_image = np.hstack([gt, pred])
-                self.visualize(np.array(save_image), text='PSNR: {:.2f}'.format(psnr), epoch = epoch)
+                self.visualize(np.array(save_image), text='PSNR: {:.2f}'.format(psnr), epoch = epoch, save_name='output_{}.png'.format(epoch))
+                low_freq = low_freq.cpu().numpy().reshape(*self.dataset.image.size[::-1], 3)
+                low_freq = (low_freq * 255).astype(np.uint8)
+                high_freq = high_freq.cpu().numpy().reshape(*self.dataset.image.size[::-1], 3)
+                high_freq = (high_freq * 255).astype(np.uint8)
+                save_image_low_freq = np.hstack([gt, low_freq])
+                save_image_high_freq = np.hstack([gt, high_freq])
+                self.visualize(np.array(save_image_low_freq), text='Low Freq', epoch = epoch, save_name='output_low_freq_{}.png'.format(epoch))
+                self.visualize(np.array(save_image_high_freq), text='High Freq', epoch = epoch, save_name='output_high_freq_{}.png'.format(epoch))
 
         return self.model, psnr
 
 
 
 
-    def visualize(self, image, text, epoch):
+    def visualize(self, image, text, epoch, save_name):
         save_image = np.ones((self.res + 50, 2 * self.res, 3), dtype=np.uint8) * 255
         img_start = 50
         save_image[img_start:img_start + self.res, :, :] = image
@@ -88,7 +98,7 @@ class Trainer:
 
         cv2.putText(save_image, text, position, font, scale, color, thickness)
 
-        cv2.imwrite(os.path.join(self.out_dir, f'output_{epoch}.png'), save_image)
+        cv2.imwrite(os.path.join(self.out_dir, f'{save_name}'), save_image)
 
 
 
@@ -105,7 +115,7 @@ if __name__ == '__main__':
 
     # parser.add_argument('-batch_size',  type = int , default= 4096 , help = 'batch_size') 
 
-    parser.add_argument('-image_size',  type = int , default= 256 , help = 'input image size') 
+    parser.add_argument('-image_size',  type = int , default= 128 , help = 'input image size') 
     parser.add_argument('-lr',  type = float , default= 1e-3 , help = 'learning_rate') 
     parser.add_argument('-nepochs',  type = int , default= 500 , help = 'epochs') 
     parser.add_argument('-training_mode',  choices=['continual', 'scratch'],
@@ -120,7 +130,8 @@ if __name__ == '__main__':
     if args.training_mode == 'scratch':
         assert args.reset == '', 'reset should be empty for scratch mode'
 
-    writer = SummaryWriter(f'./runs10/new_arch/{args.seed}_{args.optimizer}_{args.training_mode}_{args.reset}_{datetime.now().strftime("%Y%m%d-%H%M%S")}')
+    path = f'new_arch/{args.image_size}_{args.seed}_{args.optimizer}_{args.training_mode}_{args.reset}_{datetime.now().strftime("%Y%m%d-%H%M%S")}'
+    writer = SummaryWriter(f'./runs10/{path}')
     image_dir = 'circles4'
     image_paths = sorted(os.listdir('circles4'))
 
@@ -139,12 +150,12 @@ if __name__ == '__main__':
         if args.training_mode == 'scratch':
             trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
                            nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr,
-                              model = None, out_dir='output4')
+                              model = None, out_dir=f'./output4/{path}')
             model, psnr = trainer.run()
         else:
             trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
                            nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr,
-                               model = model, out_dir='output4')
+                               model = model, out_dir=f'./output4/{path}')
             model, psnr = trainer.run()
             if args.reset == 'high':
                 model.reset_high_freq()

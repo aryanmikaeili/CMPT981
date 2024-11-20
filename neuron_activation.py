@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class ActivationTrackingMLP(nn.Module):
     def __init__(self, input_dim=2, output_dim=3, width=256, num_layers=2):
         super().__init__()
@@ -25,7 +27,7 @@ class ActivationTrackingMLP(nn.Module):
         current = x
         
         for i, layer in enumerate(self.layers):
-            current = layer(current)
+            current = layer(current.to(device))
             if i in self.relu_indices:
                 activations[f'relu_{i}'] = current.clone()
         
@@ -50,6 +52,11 @@ class ActivationTrackingMLP(nn.Module):
             
         # Get activations for all samples
         _, activations = self(X, track_activations=True)
+        # print(activations)
+        # for key, value in activations.items():
+        #     print(f'{key}: {value}')
+        #     print(f'mean of {key}: {value.mean()}')
+
         
         total_neurons = 0
         total_reinitialized = 0

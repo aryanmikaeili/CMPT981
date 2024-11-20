@@ -12,6 +12,7 @@ from dataset import ImageDataset
 from updated_models import FCNet
 import utils
 from torch.utils.tensorboard import SummaryWriter
+from datetime import datetime
 
 from accelerate.utils import set_seed
 from optim_adahessian import Adahessian
@@ -56,7 +57,10 @@ class Trainer:
                 self.optimizer.zero_grad()
                 out = self.model(coords)
                 loss = self.criterion(out, rgb_vals)
-                loss.backward(create_graph=True)
+                if args.optimizer == 'seng' or args.optimizer == 'adahessian' or args.optimizer == 'lbfgs':
+                    loss.backward(create_graph=True)
+                else:
+                    loss.backward()
                 self.optimizer.step()
 
 
@@ -93,7 +97,7 @@ class Trainer:
 
         cv2.putText(save_image, text, position, font, scale, color, thickness)
 
-        cv2.imwrite(os.path.join(self.out_dir, f'output_{epoch}.png'), save_image)
+        #cv2.imwrite(os.path.join(self.out_dir, f'output_{epoch}.png'), save_image)
 
 
 
@@ -134,7 +138,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     set_seed(args.seed)
-    writer = SummaryWriter(f'./runs_{args.seed}_{args.optimizer}_{args.training_mode}_{args.reinitialize}_{args.re_inputs}_{args.re_outputs}_{args.re_th}_{args.re_percentage}')
+    writer = SummaryWriter(f'./activation_base_reinit/runs_{args.seed}_{args.optimizer}_{args.training_mode}_{args.reinitialize}_{args.re_inputs}_{args.re_outputs}_{args.re_th}_{args.re_percentage}_{datetime.now().strftime("%Y%m%d-%H%M%S")}')
     #image_dir = f'circles4_reinitialization_{args.re_inputs}_{args.re_outputs}_{args.re_th}'
 
     image_dir = 'circles4'
@@ -155,6 +159,9 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     print(f"Using device: {device}")
+    if device.type == "cuda":
+        pass
+        #torch.set_default_tensor_type(torch.cuda.FloatTensor)
 
 
     
@@ -163,12 +170,12 @@ if __name__ == '__main__':
         if args.training_mode == 'scratch':
             trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
                            nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr, device= device,
-                              model = None, out_dir=f'output4_reinitialization_{args.re_inputs}_{args.re_outputs}_{args.re_th}')
+                              model = None, out_dir=f'./output4/reinitialization_{args.re_inputs}_{args.re_outputs}_{args.re_th}')
             model, psnr = trainer.run()
         else:
             trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
                            nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr, device= device,
-                               model = model, out_dir=f'output4_reinitialization_{args.re_inputs}_{args.re_outputs}_{args.re_th}')
+                               model = model, out_dir=f'./output4/reinitialization_{args.re_inputs}_{args.re_outputs}_{args.re_th}')
             model, psnr = trainer.run()
         
         if args.reinitialize:
