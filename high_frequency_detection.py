@@ -150,7 +150,8 @@ def test_thresholds(image_path):
             image_path, 
             canny_low=param['low'],
             canny_high=param['high'],
-            blur_sigma=param['blur']
+            blur_sigma=param['blur'],
+            dilate = True
         )
         
         plt.subplot(2, 3, i)

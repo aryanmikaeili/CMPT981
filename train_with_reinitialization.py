@@ -129,12 +129,15 @@ if __name__ == '__main__':
 
     parser.add_argument('-re_percentage',  type = float , default= None , help = 'percentage for finding active neurons in each layer') 
 
+    parser.add_argument('-use_low', type=str2bool, nargs='?', 
+                        const=True, default= False, help='wether to use low frequency samples for reinitializing neurons as well')
+
     
     
 
     args = parser.parse_args()
     set_seed(args.seed)
-    writer = SummaryWriter(f'./runs_{args.seed}_{args.optimizer}_{args.training_mode}_{args.reinitialize}_{args.re_inputs}_{args.re_outputs}_{args.re_th}_{args.re_percentage}')
+    writer = SummaryWriter(f'./runs_{args.seed}_{args.optimizer}_{args.training_mode}_{args.reinitialize}_{args.use_low}_{args.re_inputs}_{args.re_outputs}_{args.re_th}_{args.re_percentage}')
     #image_dir = f'circles4_reinitialization_{args.re_inputs}_{args.re_outputs}_{args.re_th}'
 
     image_dir = 'circles4'
@@ -151,6 +154,7 @@ if __name__ == '__main__':
     print(f're_inputs is {args.re_inputs}')
     print(f're_outputs is {args.re_outputs}')
     print(f'the threshold for reinitialization is {args.re_th}')
+    print(f'using low frequency points as well : {args.use_low}')
     # Set device to 'cuda' if CUDA is available, otherwise default to 'cpu'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -180,17 +184,34 @@ if __name__ == '__main__':
             print(f'number of coordinates with high frequency : {len(high_frequency_coordinates)}')
 
             high_frequency_coordinates_tensor = torch.tensor(high_frequency_coordinates)
+            
+
+            low_frequency_coordinates_tensor = None
+            if args.use_low: # using the low frequency points as well
+
+                # Generate coordinate arrays
+                x = np.arange(args.image_size)
+                y = np.arange(args.image_size)
+                xx, yy = np.meshgrid(x, y)
+
+                # Stack and reshape the coordinate arrays
+                all_coordinates = np.stack((xx.ravel(), yy.ravel()), axis=-1).tolist()
+                low_frequency_coordinates = [coordinate for coordinate in all_coordinates if coordinate not in high_frequency_coordinates]
+                low_frequency_coordinates_tensor = torch.tensor(low_frequency_coordinates)
+
 
             model.reinitialize_neurons(X = high_frequency_coordinates_tensor, threshold= args.re_th, top_percentage= args.re_percentage,
-                                       reinit_input= args.re_inputs, reinit_output= args.re_outputs)
+                                       reinit_input= args.re_inputs, reinit_output= args.re_outputs, X_negative= low_frequency_coordinates_tensor)
 
         
         writer.add_scalar('PSNR', psnr, counter)
         
-
+# for training adam continually with reinitiliazation with percentage (only reinitialize top 10% in each layer) and using low frequency points as well
+# python train_with_reinitialization.py -optimizer adam -training_mode continual -re_percentage 0.1 -use_low True
 
 # for training adam continually with reinitiliazation
 # python train_with_reinitialization.py -optimizer adam -training_mode continual -re_th 0.8
+
 
 # for training adam continually with reinitiliazation with percentage (only reinitialize top 10% in each layer)
 # python train_with_reinitialization.py -optimizer adam -training_mode continual -re_percentage 0.1

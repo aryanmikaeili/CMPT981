@@ -32,54 +32,74 @@ class ActivationTrackingMLP(nn.Module):
         output = torch.sigmoid(current)
         return output, activations
 
-    def reinitialize_neurons(self, X, threshold=None, top_percentage=None, reinit_input=True, reinit_output=True):
+    def reinitialize_neurons(self, X, threshold=None, top_percentage=None, reinit_input=True, reinit_output=True, X_negative=None):
         """
-        Reinitialize neurons based on their average activation over samples X.
-        If both threshold and top_percentage are provided, reinitialize top_percentage of
-        neurons that have activation > threshold.
+        Reinitialize neurons based on their activation patterns. If X_negative is provided,
+        uses contrast scores (ratio of positive to negative activation) instead of raw activations.
         
         Args:
-            X (torch.Tensor): Input samples to compute activations
-            threshold (float, optional): Threshold for average activation
-            top_percentage (float, optional): Percentage of qualifying neurons to reinitialize (0-100)
+            X (torch.Tensor): Desired input samples to compute activations
+            threshold (float, optional): Threshold for contrast score or activation
+            top_percentage (float, optional): Percentage of neurons to reinitialize (0-100)
             reinit_input (bool): Whether to reinitialize input weights
             reinit_output (bool): Whether to reinitialize output weights
+            X_negative (torch.Tensor, optional): If provided, select neurons based on contrast score
         """
         if threshold is None and top_percentage is None:
             raise ValueError("At least one of 'threshold' or 'top_percentage' must be provided")
             
-        # Get activations for all samples
-        _, activations = self(X, track_activations=True)
+        # Get activations for positive samples
+        _, activations_pos = self(X, track_activations=True)
+        
+        # Get activations for negative samples if provided
+        if X_negative is not None:
+            _, activations_neg = self(X_negative, track_activations=True)
         
         total_neurons = 0
         total_reinitialized = 0
         
         # For each ReLU layer
         for relu_idx, linear_idx in zip(self.relu_indices[:-1], self.linear_indices[1:-1]):
-            # Get average activation for each neuron over all samples
-            relu_activations = activations[f'relu_{relu_idx}']
-            avg_activations = relu_activations.mean(dim=0)  # Average over batch dimension
+            # Get average activation for positive samples
+            relu_activations_pos = activations_pos[f'relu_{relu_idx}']
+            avg_activations_pos = relu_activations_pos.mean(dim=0)
             
+            if X_negative is not None:
+                # Get average activation for negative samples
+                relu_activations_neg = activations_neg[f'relu_{relu_idx}']
+                avg_activations_neg = relu_activations_neg.mean(dim=0)
+                
+                # Calculate contrast score: ratio of positive to negative activation
+                eps = 1e-6  # small epsilon to avoid division by zero
+                scores = avg_activations_pos / (avg_activations_neg + eps)
+                
+                # Print statistics about contrast scores
+                print(f"\nLayer {linear_idx} contrast scores:")
+                print(f"Min: {scores.min():.2f}, Max: {scores.max():.2f}, "
+                      f"Mean: {scores.mean():.2f}, Median: {scores.median():.2f}")
+            else:
+                scores = avg_activations_pos
+           
             if threshold is None:
                 # Only top percentage-based
-                k = int(len(avg_activations) * top_percentage)
+                k = int(len(scores) * top_percentage)
                 if k > 0:
-                    _, top_indices = torch.topk(avg_activations, k)
-                    neurons_to_reinit = torch.zeros_like(avg_activations, dtype=torch.bool)
+                    _, top_indices = torch.topk(scores, k)
+                    neurons_to_reinit = torch.zeros_like(scores, dtype=torch.bool)
                     neurons_to_reinit[top_indices] = True
                 else:
-                    neurons_to_reinit = torch.zeros_like(avg_activations, dtype=torch.bool)
+                    neurons_to_reinit = torch.zeros_like(scores, dtype=torch.bool)
             
             elif top_percentage is None:
                 # Only threshold-based
-                neurons_to_reinit = avg_activations > threshold
+                neurons_to_reinit = scores > threshold
                 
             else:
                 # Combined case: top percentage of neurons above threshold
-                above_threshold = avg_activations > threshold
+                above_threshold = scores > threshold
                 if above_threshold.sum() > 0:
                     # Get values and indices of neurons above threshold
-                    qualified_values = avg_activations[above_threshold]
+                    qualified_values = scores[above_threshold]
                     qualified_indices = torch.where(above_threshold)[0]
                     
                     # Calculate how many to reinitialize
@@ -90,15 +110,15 @@ class ActivationTrackingMLP(nn.Module):
                         selected_indices = qualified_indices[top_k_indices]
                         
                         # Create final mask
-                        neurons_to_reinit = torch.zeros_like(avg_activations, dtype=torch.bool)
+                        neurons_to_reinit = torch.zeros_like(scores, dtype=torch.bool)
                         neurons_to_reinit[selected_indices] = True
                     else:
-                        neurons_to_reinit = torch.zeros_like(avg_activations, dtype=torch.bool)
+                        neurons_to_reinit = torch.zeros_like(scores, dtype=torch.bool)
                 else:
-                    neurons_to_reinit = torch.zeros_like(avg_activations, dtype=torch.bool)
+                    neurons_to_reinit = torch.zeros_like(scores, dtype=torch.bool)
             
             num_reinit = neurons_to_reinit.sum().item()
-            total_neurons += len(avg_activations)
+            total_neurons += len(scores)
             total_reinitialized += num_reinit
             
             if num_reinit > 0:
@@ -107,38 +127,38 @@ class ActivationTrackingMLP(nn.Module):
                 
                 # Reinitialize input weights if requested
                 if reinit_input:
-                    
                     with torch.no_grad():
                         device = current_layer.weight.device
                         current_layer.weight.data[neurons_to_reinit] = nn.init.kaiming_uniform_(
-                            current_layer.weight.data[neurons_to_reinit].clone(), a = math.sqrt(5)).to(device) # this is the same as line 107 in nn.linear code
-                    if current_layer.bias is not None:
-                        nn.init.zeros_(current_layer.bias[neurons_to_reinit]).to(device)
-                    
-                    
+                            current_layer.weight.data[neurons_to_reinit].clone(), a=math.sqrt(5)).to(device)
+                        if current_layer.bias is not None:
+                            nn.init.zeros_(current_layer.bias[neurons_to_reinit]).to(device)
                 
                 # Reinitialize output weights if requested
                 if reinit_output:
                     with torch.no_grad():
                         device = next_layer.weight.device
-                        next_layer.weight[:, neurons_to_reinit] = nn.init.kaiming_uniform_(next_layer.weight[:, neurons_to_reinit].clone(), a = math.sqrt(5)).to(device)
-                        # this is the same as line 107 in nn.linear code
+                        next_layer.weight[:, neurons_to_reinit] = nn.init.kaiming_uniform_(
+                            next_layer.weight[:, neurons_to_reinit].clone(), a=math.sqrt(5)).to(device)
+                
+                # Print statistics
+                if X_negative is not None:
+                    print(f"Selected neurons were based on contrast scores")
+                    
                 
                 if threshold is not None and top_percentage is not None:
-                    print(f"Layer {linear_idx}: {(above_threshold.sum().item()/len(avg_activations)*100):.1f}% neurons above threshold {threshold:.3f}")
-                    print(f"           Reinitialized top {top_percentage}% of them: {num_reinit}/{len(avg_activations)} neurons "
-                        f"({(num_reinit/len(avg_activations)*100):.1f}%)")
+                    print(f"Layer {linear_idx}: {(above_threshold.sum().item()/len(scores)*100):.1f}% neurons above threshold {threshold:.3f}")
+                    print(f"           Reinitialized top {top_percentage}% of them: {num_reinit}/{len(scores)} neurons "
+                            f"({(num_reinit/len(scores)*100):.1f}%)")
                 elif threshold is not None:
-                    print(f'reinitialized neurons in this layer with activation greater than {threshold}')
-                    print(f"Layer {linear_idx}: Reinitialized {num_reinit}/{len(avg_activations)} neurons "
-                        f"({(num_reinit/len(avg_activations)*100):.1f}%) with activation > {threshold:.3f}")
+                    print(f"Layer {linear_idx}: Reinitialized {num_reinit}/{len(scores)} neurons "
+                            f"({(num_reinit/len(scores)*100):.1f}%) with activation > {threshold:.3f}")
                 else:
-                    print(f'reinitialized top {top_percentage * 100} % of neurons in this layer')
-                    print(f"Layer {linear_idx}: Reinitialized top {num_reinit}/{len(avg_activations)} neurons "
-                        f"({(num_reinit/len(avg_activations)*100):.1f}%)")
-        
+                    print(f"Layer {linear_idx}: Reinitialized top {num_reinit}/{len(scores)} neurons "
+                            f"({(num_reinit/len(scores)*100):.1f}%)")
+    
         print(f"\nTotal: Reinitialized {total_reinitialized}/{total_neurons} neurons "
-            f"({(total_reinitialized/total_neurons*100):.1f}%)")
+              f"({(total_reinitialized/total_neurons*100):.1f}%)")
         
         return total_reinitialized, total_neurons  
 
