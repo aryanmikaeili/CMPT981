@@ -37,7 +37,7 @@ class FCNet(nn.Module):
             out, activations = self.mlp(x, track_activations)
             return out, activations
             
-    def reinitialize_neurons(self, X, threshold = None, top_percentage = None, reinit_input=True, reinit_output=True):
+    def reinitialize_neurons(self, X, threshold = None, top_percentage = None, reinit_input=True, reinit_output=True, X_negative = None):
         """
         Reinitialize neurons of the MLP based on their average activation over samples X.
         
@@ -51,6 +51,9 @@ class FCNet(nn.Module):
         # First apply positional encoding if used
         if self.use_pe:
             X = self.pe(X)
-            
+            if X_negative is not None:
+                X_negative = self.pe(X_negative)
         # Call the MLP's reinitialization method
-        return self.mlp.reinitialize_neurons(X, threshold, top_percentage,  reinit_input, reinit_output)
+        
+        return self.mlp.reinitialize_neurons(X= X, threshold= threshold, top_percentage= top_percentage,  
+                                             reinit_input= reinit_input, reinit_output= reinit_output, X_negative= X_negative)
