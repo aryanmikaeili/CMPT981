@@ -1,7 +1,15 @@
 # --- existing rules ---
-*/
+# Ignore any untracked folder at the repo root (keeps new runs_*/output_* dirs out).
+# Leading slash anchors the rule to the root so it does NOT recursively re-ignore
+# subfolders inside tracked directories like further_experiments/ or recap_2026/.
+/*/
 .env
 .env.*
+
+# --- folders we DO want tracked (un-ignore from /*/ above) ---
+!/further_experiments/
+!/recap_2026/
+!/scripts/
 
 # --- Python ---
 __pycache__/
@@ -54,6 +62,12 @@ events.out.tfevents.*
 *.pth
 *.onnx
 *.safetensors
+
+# Per-experiment output dirs (large image dumps, never push these)
+outputs/
+further_experiments/*/outputs/
+recap_2026/output/
+recap_2026/runs/
 
 # --- jupyter ---
 .ipynb_checkpoints/
