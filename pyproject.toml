@@ -1,0 +1,30 @@
+[project]
+name = "cmpt981"
+version = "0.1.0"
+description = "CMPT 981 research code (continual learning, reinitialization, optimizer experiments)."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "accelerate>=1.13",
+    "matplotlib>=3.10",
+    "numpy>=2.4",
+    "opencv-python>=4.13",
+    "pillow>=12.2",
+    "scipy>=1.17",
+    "tensorboard>=2.20",
+    "torch>=2.11",
+    "torchvision>=0.26",
+    "tqdm>=4.67",
+]
+
+[dependency-groups]
+dev = [
+    "gitpython>=3.1",
+    "huggingface-hub>=1.14",
+    "psutil>=7.2",
+    "pyyaml>=6.0",
+    "sentry-sdk>=2.59",
+    "wandb>=0.26",
+]
+
+[tool.uv]
+package = false

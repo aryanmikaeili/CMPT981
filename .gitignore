@@ -1,2 +1,59 @@
+# --- existing rules ---
 */
 .env
+.env.*
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# --- virtualenvs / uv ---
+.venv/
+venv/
+env/
+.uv-cache/
+
+# --- build / packaging artifacts ---
+build/
+dist/
+wheels/
+*.egg
+*.egg-info/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --- testing / type-checking caches ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# --- editors / IDE / OS ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- ML / experiment outputs ---
+wandb/
+mlruns/
+*.tfevents.*
+events.out.tfevents.*
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.safetensors
+
+# --- jupyter ---
+.ipynb_checkpoints/
