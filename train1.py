@@ -44,7 +44,7 @@ class Trainer:
         self.nepochs = nepochs
 
     def run(self):
-        pbar = tqdm(range(self.nepochs))
+        pbar = tqdm(range(self.nepochs), desc='Epochs', leave=False, position=1)
         for epoch in pbar:
             self.model.train()
             for coords, rgb_vals in self.dataloader:
@@ -64,7 +64,12 @@ class Trainer:
                     pred, low_freq, high_freq = self.model(coords)
                     gt = self.dataset.rgb_vals
                     psnr = utils.get_psnr(pred, gt)
-                pbar.set_description(f'Epoch:: {epoch}, PSNR: {psnr.item()}')
+                    psnr_low = utils.get_psnr(low_freq, gt)
+                    psnr_high = utils.get_psnr(high_freq, gt)
+                pbar.set_description(
+                    f'Epoch:: {epoch}, PSNR: {psnr.item():.2f}, '
+                    f'low: {psnr_low.item():.2f}, high: {psnr_high.item():.2f}'
+                )
                 pred = pred.cpu().numpy().reshape(*self.dataset.image.size[::-1], 3)
                 pred = (pred * 255).astype(np.uint8)
                 gt = self.dataset.rgb_vals.cpu().numpy().reshape(*self.dataset.image.size[::-1], 3)
@@ -77,10 +82,10 @@ class Trainer:
                 high_freq = (high_freq * 255).astype(np.uint8)
                 save_image_low_freq = np.hstack([gt, low_freq])
                 save_image_high_freq = np.hstack([gt, high_freq])
-                self.visualize(np.array(save_image_low_freq), text='Low Freq', epoch = epoch, save_name='output_low_freq_{}.png'.format(epoch))
-                self.visualize(np.array(save_image_high_freq), text='High Freq', epoch = epoch, save_name='output_high_freq_{}.png'.format(epoch))
+                self.visualize(np.array(save_image_low_freq), text='Low Freq PSNR: {:.2f}'.format(psnr_low), epoch = epoch, save_name='output_low_freq_{}.png'.format(epoch))
+                self.visualize(np.array(save_image_high_freq), text='High Freq PSNR: {:.2f}'.format(psnr_high), epoch = epoch, save_name='output_high_freq_{}.png'.format(epoch))
 
-        return self.model, psnr
+        return self.model, psnr, psnr_low, psnr_high
 
 
 
@@ -124,14 +129,20 @@ if __name__ == '__main__':
     
     parser.add_argument('-reset',  choices=['no', 'high', 'low', ''], default='') 
 
+    parser.add_argument('-out_root', type=str, default='recap_2026',
+                        help='parent folder for all outputs (TB logs + image dumps)')
+
     args = parser.parse_args()
     set_seed(args.seed)
 
     if args.training_mode == 'scratch':
         assert args.reset == '', 'reset should be empty for scratch mode'
 
-    path = f'new_arch/{args.image_size}_{args.seed}_{args.optimizer}_{args.training_mode}_{args.reset}_{datetime.now().strftime("%Y%m%d-%H%M%S")}'
-    writer = SummaryWriter(f'./runs10/{path}')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f'Using device: {device}')
+
+    path = f'{args.image_size}_{args.seed}_{args.optimizer}_{args.training_mode}_{args.reset}_{datetime.now().strftime("%Y%m%d-%H%M%S")}'
+    writer = SummaryWriter(f'./{args.out_root}/runs/{path}')
     image_dir = 'circles4'
     image_paths = sorted(os.listdir('circles4'))
 
@@ -144,19 +155,20 @@ if __name__ == '__main__':
     print(f'The image size is {args.image_size}')
 
     
-    for counter, image_path in enumerate(image_paths):
-        print(image_path)
-       
+    outer = tqdm(enumerate(image_paths), total=len(image_paths), desc='Images', position=0)
+    for counter, image_path in outer:
+        outer.set_postfix_str(image_path)
+
         if args.training_mode == 'scratch':
             trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
-                           nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr,
-                              model = None, out_dir=f'./output4/{path}')
-            model, psnr = trainer.run()
+                           nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr, device=device,
+                              model = None, out_dir=f'./{args.out_root}/output/{path}')
+            model, psnr, psnr_low, psnr_high = trainer.run()
         else:
             trainer = Trainer(os.path.join(image_dir, image_path), args.image_size, batch_size= args.image_size* args.image_size,
-                           nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr,
-                               model = model, out_dir=f'./output4/{path}')
-            model, psnr = trainer.run()
+                           nepochs= args.nepochs, optimizer= args.optimizer , lr= args.lr, device=device,
+                               model = model, out_dir=f'./{args.out_root}/output/{path}')
+            model, psnr, psnr_low, psnr_high = trainer.run()
             if args.reset == 'high':
                 model.reset_high_freq()
             elif args.reset == 'low':
@@ -168,6 +180,8 @@ if __name__ == '__main__':
         #trainer = Trainer(os.path.join(image_dir, image_path), 256, batch_size=256*256, nepochs=500, model = None, out_dir=f'output{5}')
         #model_scratch, psnr_scratch = trainer.run()
         writer.add_scalar('PSNR', psnr, counter)
+        writer.add_scalar('PSNR_low', psnr_low, counter)
+        writer.add_scalar('PSNR_high', psnr_high, counter)
         #writer.add_scalar('PSNR_scratch', psnr_scratch, counter)
         #writer.add_scalar('PSNR_diff', psnr - psnr_scratch, counter)
 

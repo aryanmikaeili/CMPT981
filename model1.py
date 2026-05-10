@@ -34,7 +34,9 @@ class MLP(nn.Module):
 
 
 class FCNet(nn.Module):
-    def __init__(self, use_pe=True, num_res = 6, num_layers = 3, width = 256):
+    def __init__(self, use_pe=True, num_res = 6, num_layers = 3, width = 256,
+                 high_freq_width=128, high_freq_layers=2,
+                 low_freq_width=256, low_freq_layers=3):
         super(FCNet, self).__init__()
         input_dim = 2
         if use_pe:
@@ -43,10 +45,18 @@ class FCNet(nn.Module):
             input_dim = 4 * num_res + 2
         self.use_pe =  use_pe
         self.input_dim = input_dim
-        self.split_dim = input_dim // 3
         print(f"in dim: {input_dim}, num_layers: {num_layers}, width: {width}")
-        self.high_freq_mlp = MLP(input_dim - 2, 3, 128, num_layers=2)
-        self.low_freq_mlp = MLP(2, 3, 256, num_layers=3)
+
+        # Store per-branch shapes so reset_*_freq rebuilds identical sub-networks.
+        self.high_freq_in = input_dim - 2
+        self.high_freq_width = high_freq_width
+        self.high_freq_layers = high_freq_layers
+        self.low_freq_in = 2
+        self.low_freq_width = low_freq_width
+        self.low_freq_layers = low_freq_layers
+
+        self.high_freq_mlp = MLP(self.high_freq_in, 3, self.high_freq_width, num_layers=self.high_freq_layers)
+        self.low_freq_mlp = MLP(self.low_freq_in, 3, self.low_freq_width, num_layers=self.low_freq_layers)
 
 
     def forward(self, x):
@@ -57,11 +67,17 @@ class FCNet(nn.Module):
         out = high_freq + low_freq
         out = torch.sigmoid(out)
         return out, torch.sigmoid(low_freq), torch.sigmoid(high_freq)
-    
+
+    def _device(self):
+        # Follow whatever device the model already lives on instead of hardcoding cuda.
+        return next(self.parameters()).device
+
     def reset_high_freq(self):
-        self.high_freq_mlp = MLP(self.input_dim - 2, 3, 256, num_layers=3).to('cuda')
+        self.high_freq_mlp = MLP(self.high_freq_in, 3, self.high_freq_width,
+                                 num_layers=self.high_freq_layers).to(self._device())
 
     def reset_low_freq(self):
-        self.low_freq_mlp = MLP(2, 3, 256, num_layers=3).to('cuda')
+        self.low_freq_mlp = MLP(self.low_freq_in, 3, self.low_freq_width,
+                                num_layers=self.low_freq_layers).to(self._device())
         
 
